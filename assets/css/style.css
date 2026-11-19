@@ -1,0 +1,110 @@
+/* Small custom CSS on top of Tailwind. Sections: login pages, general, tables, A4 document, quotation form, sidebar, print. */
+
+/* ---------- Login / sign up / forgot password ---------- */
+/* One gradient for all three pages (same look on all three) */
+.auth-gradient { background: linear-gradient(145deg, #0b1f44 0%, #12306b 55%, #2c4a8f 100%); }
+.auth-soft {
+  background:
+    radial-gradient(60rem 30rem at 100% 0%, rgba(44,74,143,.14), transparent 60%),
+    radial-gradient(50rem 30rem at 0% 100%, rgba(18,48,107,.10), transparent 60%),
+    linear-gradient(160deg, #f6f8fc 0%, #e6edf8 100%);
+}
+/* These pages never scroll the page; the form card scrolls silently only on very short screens */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---------- General ---------- */
+.bg-pattern {
+  background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+:focus-visible { outline: 2px solid #1e4488; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+html { scroll-behavior: smooth; }
+main { min-width: 0; }   /* wide content never stretches the page sideways */
+
+/* Long text (notice, addresses, names, descriptions) wraps instead of running off the page */
+.wrap-any { overflow-wrap: anywhere; word-break: break-word; min-width: 0; max-width: 100%; }
+.avoid-break { break-inside: avoid; page-break-inside: avoid; }
+
+/* ---------- Tables turn into stacked cards on phones ---------- */
+@media (max-width: 767px) {
+  .resp-table, .resp-table tbody, .resp-table tr, .resp-table td { display: block; width: 100%; }
+  .resp-table thead { display: none; }
+  .resp-table tr { padding: .75rem 1rem; border-bottom: 1px solid #e2e8f0; }
+  .resp-table tr:last-child { border-bottom: 0; }
+  .resp-table td { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+                   padding: .3rem 0 !important; text-align: right; overflow-wrap: anywhere; }
+  .resp-table td::before { content: attr(data-label); flex: 0 0 auto; font-weight: 600; font-size: .75rem;
+                           color: #64748b; text-align: left; padding-top: .1rem; }
+  .resp-table td.cell-actions { display: block; padding-top: .6rem !important; margin-top: .4rem; border-top: 1px dashed #e2e8f0; }
+  .resp-table td.cell-actions::before { content: none; }
+  .resp-table td.cell-actions > div { justify-content: flex-start; flex-wrap: wrap; row-gap: .5rem; }
+  .resp-table td p { max-width: none !important; white-space: normal; }
+}
+
+/* ---------- A4 document (quotation + invoice view pages, live preview) ---------- */
+/* Long text always wraps inside the sheet */
+#doc, #doc * { overflow-wrap: anywhere; word-break: break-word; }
+#doc { min-width: 0; }
+#doc .grid > *, #doc .flex > * { min-width: 0; }
+#doc table { width: 100%; table-layout: auto; }
+
+/* The host keeps the sheet below the button bar */
+.a4-host { width: 100%; position: relative; z-index: 0; isolation: isolate; }
+.a4-sheet {
+  width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15,23,42,.12), 0 12px 32px rgba(15,23,42,.10);
+}
+
+/* Button bar above the sheet: exactly as wide as the sheet; status dropdown always stays on top of the banner */
+.doc-toolbar { width: 210mm; max-width: 100%; margin: 0 auto 1.25rem; box-sizing: border-box; position: relative; z-index: 10; }
+
+/* ---------- Quotation form: item rows ---------- */
+/* Stacked on a narrow form, one tidy line on a wide form (follows the form's width, not the screen's) */
+.ir-wrap { container-type: inline-size; }
+.ir-head { display: none; }
+.ir { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; align-items: start; }
+.ir-item, .ir-desc { grid-column: 1 / -1; }
+.ir-amt-val { padding-top: .1rem; }
+.ir-rm { text-align: right; align-self: end; grid-column: 1 / -1; }
+@container (min-width: 900px) {
+  .ir-head, .ir { grid-template-columns: minmax(0, 1fr) 8.5rem 6rem 6.5rem 8.5rem 4.5rem; column-gap: .75rem; }
+  .ir-rm { grid-column: auto; }
+  .ir-head { display: grid; padding: 0 calc(.75rem + 1px) .5rem; }
+  .ir-item { grid-column: auto; }
+  .ir-desc { grid-column: 1 / -1; }
+  .ir-lbl { display: none; }
+  .ir-amt { text-align: right; }
+  .ir-amt-val { padding-top: .625rem; }
+  .ir-rm { text-align: right; align-self: start; padding-top: .5rem; }
+}
+
+/* ---------- Collapsible sidebar (desktop): full menu <-> icons only, remembered in the browser ---------- */
+.lg\:pl-64 { transition: padding-left .2s; }
+@media (min-width: 1024px) {
+  body.sb-collapsed #sidebar { width: 4.5rem; }
+  body.sb-collapsed .lg\:pl-64 { padding-left: 4.5rem; }
+  body.sb-collapsed #sidebar .sb-label { display: none; }
+  body.sb-collapsed #sidebar nav a,
+  body.sb-collapsed #sidebar > div:last-child a { justify-content: center; padding-left: 0; padding-right: 0; }
+  body.sb-collapsed #sidebar > div:first-child { flex-direction: column; justify-content: center; gap: .5rem; height: auto; padding: .75rem 0; }
+  body.sb-collapsed #sidebar > div:last-child > div { justify-content: center; }
+  body.sb-collapsed .sb-chevron { transform: rotate(180deg); }
+}
+
+/* ---------- Print: one A4 sheet, no buttons ---------- */
+@media print {
+  @page { size: A4; margin: 0; }
+  #doc { min-height: 296mm; }
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .lg\:pl-64 { padding-left: 0 !important; }
+  main { padding: 0 !important; }
+  article { border: 0 !important; box-shadow: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .a4-sheet { zoom: 1 !important; width: 210mm !important; margin: 0 !important; box-shadow: none !important; }
+  /* never cut an item row in half, repeat the table heading on each sheet */
+  #doc tr { break-inside: avoid; page-break-inside: avoid; }
+  #doc thead { display: table-header-group; }
+}
