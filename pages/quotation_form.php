@@ -20,7 +20,14 @@ if ($id) {
     }
 }
 
-$ps = $pdo->prepare('SELECT item_id, name, price, unit FROM product_service WHERE company_id = ? ORDER BY name');
+// uses / last_used feed the picker's "Recently used" list (how often and when each saved item was last put on a quotation)
+$ps = $pdo->prepare('SELECT p.item_id, p.name, p.price, p.unit, COUNT(qi.quotation_item_id) AS uses, MAX(q.created_at) AS last_used
+                     FROM product_service p
+                     LEFT JOIN quotation_item qi ON qi.item_id = p.item_id
+                     LEFT JOIN quotation q ON q.quotation_id = qi.quotation_id
+                     WHERE p.company_id = ?
+                     GROUP BY p.item_id, p.name, p.price, p.unit
+                     ORDER BY p.name');
 $ps->execute([$cid]);
 $products = $ps->fetchAll();
 $validIds = array_map('intval', array_column($products, 'item_id'));

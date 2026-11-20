@@ -108,3 +108,8 @@ main { min-width: 0; }   /* wide content never stretches the page sideways */
   #doc tr { break-inside: avoid; page-break-inside: avoid; }
   #doc thead { display: table-header-group; }
 }
+
+/* Item picker (quotation form): section labels and the search-word highlight */
+.picker-sec { padding: 6px 16px; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: #64748b; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+.picker-sec:not(:first-child) { border-top: 1px solid #f1f5f9; }
+.hl { font-weight: 700; background: rgba(250, 204, 21, .35); border-radius: 3px; }

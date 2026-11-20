@@ -101,6 +101,46 @@ qform.addEventListener('submit', ev => {
   }
 });
 
+// ---- Item picker helpers: multi-word search, ranking, highlight ----
+const PICKER_MAX = 50;
+const searchTokens = v => v.toLowerCase().split(/\s+/).filter(Boolean);
+
+// 0 = name starts with the first word, 1 = a word in the name starts with it, 2 = just contains it
+function matchRank(p, tokens) {
+  const n = p.name.toLowerCase();
+  if (n.startsWith(tokens[0])) return 0;
+  return n.split(/[\s\-\/(]+/).some(w => w.startsWith(tokens[0])) ? 1 : 2;
+}
+
+// Writes text into el, wrapping every part that matches a search word in <b class="hl">
+function highlightInto(el, text, tokens) {
+  if (!tokens.length) { el.textContent = text; return; }
+  const low = text.toLowerCase();
+  const mark = new Array(text.length).fill(false);
+  tokens.forEach(t => {
+    let i = low.indexOf(t);
+    while (i !== -1) {
+      for (let k = i; k < i + t.length; k++) mark[k] = true;
+      i = low.indexOf(t, i + t.length);
+    }
+  });
+  let i = 0;
+  while (i < text.length) {
+    let j = i;
+    while (j < text.length && mark[j] === mark[i]) j++;
+    const part = text.slice(i, j);
+    if (mark[i]) {
+      const b = document.createElement('b');
+      b.className = 'hl';
+      b.textContent = part;
+      el.appendChild(b);
+    } else {
+      el.appendChild(document.createTextNode(part));
+    }
+    i = j;
+  }
+}
+
 function addRow(r) {
   r = r || {};
   const row = document.createElement('div');
@@ -112,7 +152,7 @@ function addRow(r) {
         '<input type="hidden" name="item_id[]">' +
         '<input name="item_name[]" autocomplete="off" placeholder="Choose or type an item" class="' + INPUT + ' pr-12">' +
         '<button type="button" class="toggle absolute inset-y-0 right-0 px-3 text-slate-500 hover:text-brand-700" aria-label="Show saved items"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg></button>' +
-        '<div class="picker hidden absolute z-20 left-0 right-0 top-full mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"></div>' +
+        '<div class="picker hidden absolute z-20 left-0 right-0 top-full mt-1 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"></div>' +
       '</div>' +
     '</div>' +
     '<div class="ir-price min-w-0">' + LBL + 'Unit price</span><input name="item_price[]" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Unit price" class="' + INPUT + '"></div>' +
@@ -157,29 +197,81 @@ function addRow(r) {
     qty.focus();
   }
 
+  let shown = [];   // items currently listed in the picker, best match first
+
   function showPicker(all) {
-    const term = all ? '' : input.value.trim().toLowerCase();
+    const tokens = all ? [] : searchTokens(input.value);
     const used = usedNames(row);
-    const list = products.filter(p => p.name.toLowerCase().includes(term) && !used.has(p.name.trim().toLowerCase()));
+    const free = products.filter(p => !used.has(normName(p.name)));
     box.innerHTML = '';
+    shown = [];
+
+    const section = text => {
+      const d = document.createElement('div');
+      d.className = 'picker-sec';
+      d.textContent = text;
+      box.appendChild(d);
+    };
+    const note = text => {
+      const d = document.createElement('p');
+      d.className = 'px-4 py-3 text-sm text-slate-500';
+      d.textContent = text;
+      box.appendChild(d);
+    };
+    const addItem = (p, top) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm hover:bg-brand-50' + (top ? ' bg-brand-50' : '');
+      const n = document.createElement('span');
+      highlightInto(n, p.name, tokens);
+      const pr = document.createElement('span');
+      pr.className = 'text-slate-500 whitespace-nowrap';
+      pr.textContent = 'Rs. ' + fmt(parseFloat(p.price)) + (p.unit && UNITS[p.unit] ? ' / ' + UNITS[p.unit] : '');
+      b.append(n, pr);
+      b.addEventListener('pointerdown', ev => { ev.preventDefault(); choose(p); });
+      box.appendChild(b);
+      shown.push(p);
+    };
+
     if (!products.length) {
-      box.innerHTML = '<p class="px-4 py-3 text-sm text-slate-500">No saved items yet. Type a name to add a custom item, or add items in Products &amp; services.</p>';
-    } else if (!list.length) {
-      box.innerHTML = '<p class="px-4 py-3 text-sm text-slate-500">No match. Keep typing to use it as a new item.</p>';
+      note('No saved items yet. Type a name to add a custom item, or add items in Products & services.');
+    } else if (!tokens.length) {
+      // nothing typed: recently used first, then everything A-Z
+      const recent = free.filter(p => p.last_used).sort((a, b) => (a.last_used < b.last_used ? 1 : -1)).slice(0, 6);
+      if (recent.length) { section('Recently used'); recent.forEach(p => addItem(p, false)); }
+      const rest = free.filter(p => !recent.includes(p));
+      if (rest.length) {
+        section(recent.length ? 'All items' : 'Saved items');
+        rest.slice(0, PICKER_MAX).forEach(p => addItem(p, false));
+        if (rest.length > PICKER_MAX) note('Type to narrow down the other ' + (rest.length - PICKER_MAX) + ' items.');
+      }
+      if (!recent.length && !rest.length) note('All saved items are already on this quotation.');
     } else {
-      list.forEach(p => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-brand-50';
-        const n = document.createElement('span');
-        n.textContent = p.name;
-        const pr = document.createElement('span');
-        pr.className = 'text-slate-500 whitespace-nowrap';
-        pr.textContent = 'Rs. ' + fmt(parseFloat(p.price)) + (p.unit && UNITS[p.unit] ? ' / ' + UNITS[p.unit] : '');
-        b.append(n, pr);
-        b.addEventListener('pointerdown', ev => { ev.preventDefault(); choose(p); });
-        box.appendChild(b);
-      });
+      // every typed word must be in the name, in any order
+      const list = free
+        .filter(p => { const n = p.name.toLowerCase(); return tokens.every(t => n.includes(t)); })
+        .sort((a, b) => matchRank(a, tokens) - matchRank(b, tokens) || (b.uses || 0) - (a.uses || 0) || a.name.localeCompare(b.name));
+      if (list.length) {
+        section('Best match');
+        addItem(list[0], true);
+        if (list.length > 1) {
+          section('Other matches');
+          list.slice(1, PICKER_MAX).forEach(p => addItem(p, false));
+          if (list.length > PICKER_MAX) note('Showing the first ' + PICKER_MAX + '. Type more words to narrow down.');
+        }
+      } else {
+        note('No saved item matches.');
+      }
+      // keep what was typed as a custom item for this quotation only
+      const typed = input.value.trim();
+      if (!list.some(p => normName(p.name) === normName(typed))) {
+        const c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'w-full px-4 py-3 text-left text-sm font-semibold text-brand-700 hover:bg-brand-50 border-t border-slate-100';
+        c.textContent = 'Use \u201C' + typed + '\u201D as a custom item';
+        c.addEventListener('pointerdown', ev => { ev.preventDefault(); box.classList.add('hidden'); price.focus(); });
+        box.appendChild(c);
+      }
     }
     box.classList.remove('hidden');
   }
@@ -187,6 +279,17 @@ function addRow(r) {
   input.addEventListener('focus', () => showPicker(false));
   input.addEventListener('input', () => { hid.value = ''; showPicker(false); });
   input.addEventListener('blur', () => setTimeout(() => box.classList.add('hidden'), 150));
+  // Enter takes the best match (no arrow keys needed); Esc closes the list
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const open = !box.classList.contains('hidden');
+      if (open && shown.length && input.value.trim() && hid.value === '') { choose(shown[0]); }
+      else { box.classList.add('hidden'); (price.value === '' ? price : qty).focus(); }
+    } else if (ev.key === 'Escape') {
+      box.classList.add('hidden');
+    }
+  });
   row.querySelector('.toggle').addEventListener('pointerdown', ev => {
     ev.preventDefault();
     if (box.classList.contains('hidden')) { showPicker(true); } else { box.classList.add('hidden'); }
